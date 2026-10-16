@@ -1,0 +1,48 @@
+namespace RaceDay.API.Models
+{
+    public class Event
+    {
+        public int EventId { get; set; }
+        public int OrganiserProfileId { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Location { get; set; } = string.Empty;
+        public DateTime EventDate { get; set; }
+
+        public OrganiserProfile Organiser { get; set; } = null!;
+        public ICollection<Category> Categories { get; set; } = new List<Category>();
+        public ICollection<Registration> Registrations { get; set; } = new List<Registration>();
+        public ICollection<Result> Results { get; set; } = new List<Result>();
+    }
+
+    public class Category
+    {
+        public int CategoryId { get; set; }
+        public int EventId { get; set; }
+        public string CategoryName { get; set; } = string.Empty; // e.g. 10km Run, 50km Cycle
+
+        public Event Event { get; set; } = null!;
+    }
+
+    public class Registration
+    {
+        public int RegistrationId { get; set; }
+        public int ParticipantProfileId { get; set; }
+        public int EventId { get; set; }
+        public DateTime RegistrationDate { get; set; } = DateTime.UtcNow;
+
+        public ParticipantProfile Participant { get; set; } = null!;
+        public Event Event { get; set; } = null!;
+    }
+
+    public class Result
+    {
+        public int ResultId { get; set; }
+        public int ParticipantProfileId { get; set; }
+        public int EventId { get; set; }
+        public string FinishTime { get; set; } = string.Empty;
+        public int Position { get; set; }
+
+        public ParticipantProfile Participant { get; set; } = null!;
+        public Event Event { get; set; } = null!;
+    }
+}
