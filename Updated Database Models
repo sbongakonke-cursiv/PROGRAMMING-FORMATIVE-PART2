@@ -1,0 +1,56 @@
+namespace RaceDay.API.Models
+{
+    public enum EventType { Run, Walk, Cycle }
+
+    public class Event
+    {
+        public int EventId { get; set; }
+        public int OrganiserProfileId { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public DateTime EventDate { get; set; }
+        public string Location { get; set; } = string.Empty;
+        public double DistanceKm { get; set; }
+        public EventType EventType { get; set; }
+
+        public OrganiserProfile Organiser { get; set; } = null!;
+        public ICollection<Category> Categories { get; set; } = new List<Category>();
+        public ICollection<Registration> Registrations { get; set; } = new List<Registration>();
+        public ICollection<Result> Results { get; set; } = new List<Result>();
+    }
+
+    public class Category
+    {
+        public int CategoryId { get; set; }
+        public int EventId { get; set; }
+        public string CategoryName { get; set; } = string.Empty; // e.g., "Under 20", "Senior", "10km"
+
+        public Event Event { get; set; } = null!;
+        public ICollection<Registration> Registrations { get; set; } = new List<Registration>();
+    }
+
+    public class Registration
+    {
+        public int RegistrationId { get; set; }
+        public int ParticipantProfileId { get; set; }
+        public int EventId { get; set; }
+        public int CategoryId { get; set; }
+        public DateTime RegistrationDate { get; set; } = DateTime.UtcNow;
+
+        public ParticipantProfile Participant { get; set; } = null!;
+        public Event Event { get; set; } = null!;
+        public Category Category { get; set; } = null!;
+    }
+
+    public class Result
+    {
+        public int ResultId { get; set; }
+        public int ParticipantProfileId { get; set; }
+        public int EventId { get; set; }
+        public string FinishTime { get; set; } = string.Empty; // e.g., "00:45:12"
+        public int Position { get; set; }
+
+        public ParticipantProfile Participant { get; set; } = null!;
+        public Event Event { get; set; } = null!;
+    }
+}
