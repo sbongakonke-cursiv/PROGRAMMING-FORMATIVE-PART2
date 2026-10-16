@@ -1,0 +1,41 @@
+using Microsoft.EntityFrameworkCore;
+using RaceDay.API.Models;
+
+namespace RaceDay.API.Data
+{
+    public class RaceDayDbContext : DbContext
+    {
+        public RaceDayDbContext(DbContextOptions<RaceDayDbContext> options) : base(options) { }
+
+        public DbSet<User> Users { get; set; }
+        public DbSet<OrganiserProfile> OrganiserProfiles { get; set; }
+        public DbSet<ParticipantProfile> ParticipantProfiles { get; set; }
+        public DbSet<Event> Events { get; set; }
+        public DbSet<Category> Categories { get; set; }
+        public DbSet<Registration> Registrations { get; set; }
+        public DbSet<Result> Results { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            // Configure Unique Email
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Email)
+                .IsUnique();
+
+            // Configure 1-to-1 relationships
+            modelBuilder.Entity<User>()
+                .HasOne(u => u.OrganiserProfile)
+                .WithOne(o => o.User)
+                .HasForeignKey<OrganiserProfile>(o => o.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<User>()
+                .HasOne(u => u.ParticipantProfile)
+                .WithOne(p => p.User)
+                .HasForeignKey<ParticipantProfile>(p => p.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        }
+    }
+}
