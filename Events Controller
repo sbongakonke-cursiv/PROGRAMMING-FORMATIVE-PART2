@@ -1,0 +1,140 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using RaceDay.API.Data;
+using RaceDay.API.Models;
+using System.Security.Claims;
+
+namespace RaceDay.API.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class EventsController : ControllerBase
+    {
+        private readonly RaceDayDbContext _context;
+
+        public EventsController(RaceDayDbContext context)
+        {
+            _context = context;
+        }
+
+        // Both roles can view events
+        [HttpGet]
+        public async Task<IActionResult> GetAllEvents()
+        {
+            var events = await _context.Events
+                .Include(e => e.Categories)
+                .Include(e => e.Organiser)
+                .ToListAsync();
+            return Ok(events);
+        }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetEventById(int id)
+        {
+            var ev = await _context.Events
+                .Include(e => e.Categories)
+                .Include(e => e.Organiser)
+                .FirstOrDefaultAsync(e => e.EventId == id);
+
+            if (ev == null) return NotFound();
+            return Ok(ev);
+        }
+
+        // Organiser: Create Event
+        [HttpPost]
+        [Authorize(Roles = "Organiser")]
+        public async Task<IActionResult> CreateEvent([FromBody] CreateEventDto dto)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var orgProfile = await _context.OrganiserProfiles.FirstOrDefaultAsync(o => o.UserId == userId);
+            if (orgProfile == null) return BadRequest("Organiser profile not found.");
+
+            var newEvent = new Event
+            {
+                OrganiserProfileId = orgProfile.OrganiserProfileId,
+                Title = dto.Title,
+                Description = dto.Description,
+                EventDate = dto.EventDate,
+                Location = dto.Location,
+                DistanceKm = dto.DistanceKm,
+                EventType = dto.EventType
+            };
+
+            _context.Events.Add(newEvent);
+            await _context.SaveChangesAsync();
+            return CreatedAtAction(nameof(GetEventById), new { id = newEvent.EventId }, newEvent);
+        }
+
+        // Organiser: Update Event
+        [HttpPut("{id}")]
+        [Authorize(Roles = "Organiser")]
+        public async Task<IActionResult> UpdateEvent(int id, [FromBody] CreateEventDto dto)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var ev = await _context.Events.Include(e => e.Organiser).FirstOrDefaultAsync(e => e.EventId == id);
+
+            if (ev == null) return NotFound();
+            if (ev.Organiser.UserId != userId) return Forbid();
+
+            ev.Title = dto.Title;
+            ev.Description = dto.Description;
+            ev.EventDate = dto.EventDate;
+            ev.Location = dto.Location;
+            ev.DistanceKm = dto.DistanceKm;
+            ev.EventType = dto.EventType;
+
+            await _context.SaveChangesAsync();
+            return Ok(ev);
+        }
+
+        // Organiser: Delete Event
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "Organiser")]
+        public async Task<IActionResult> DeleteEvent(int id)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var ev = await _context.Events.Include(e => e.Organiser).FirstOrDefaultAsync(e => e.EventId == id);
+
+            if (ev == null) return NotFound();
+            if (ev.Organiser.UserId != userId) return Forbid();
+
+            _context.Events.Remove(ev);
+            await _context.SaveChangesAsync();
+            return Ok(new { Message = "Event deleted successfully." });
+        }
+
+        // Organiser: Define category for an event[cite: 4]
+        [HttpPost("{eventId}/categories")]
+        [Authorize(Roles = "Organiser")]
+        public async Task<IActionResult> AddCategory(int eventId, [FromBody] CategoryDto dto)
+        {
+            var ev = await _context.Events.FindAsync(eventId);
+            if (ev == null) return NotFound("Event not found.");
+
+            var category = new Category
+            {
+                EventId = eventId,
+                CategoryName = dto.CategoryName
+            };
+
+            _context.Categories.Add(category);
+            await _context.SaveChangesAsync();
+            return Ok(category);
+        }
+    }
+
+    public class CreateEventDto
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public DateTime EventDate { get; set; }
+        public string Location { get; set; } = string.Empty;
+        public double DistanceKm { get; set; }
+        public EventType EventType { get; set; }
+    }
+
+    public class CategoryDto
+    {
+        public string CategoryName { get; set; } = string.Empty;
+    }
