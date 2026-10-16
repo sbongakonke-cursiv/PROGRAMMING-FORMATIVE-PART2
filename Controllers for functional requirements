@@ -1,0 +1,76 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using RaceDay.API.Data;
+using System.Security.Claims;
+
+namespace RaceDay.API.Controllers
+{
+    [Authorize]
+    [ApiController]
+    [Route("api/[controller]")]
+    public class ProfileController : ControllerBase
+    {
+        private readonly RaceDayDbContext _context;
+
+        public ProfileController(RaceDayDbContext context)
+        {
+            _context = context;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetMyProfile()
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var user = await _context.Users
+                .Include(u => u.OrganiserProfile)
+                .Include(u => u.ParticipantProfile)
+                .FirstOrDefaultAsync(u => u.UserId == userId);
+
+            if (user == null) return NotFound();
+
+            return Ok(new
+            {
+                user.UserId,
+                user.FullName,
+                user.Email,
+                Role = user.Role.ToString(),
+                OrganiserInfo = user.OrganiserProfile,
+                ParticipantInfo = user.ParticipantProfile
+            });
+        }
+
+        [HttpPut]
+        public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto dto)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var user = await _context.Users
+                .Include(u => u.OrganiserProfile)
+                .Include(u => u.ParticipantProfile)
+                .FirstOrDefaultAsync(u => u.UserId == userId);
+
+            if (user == null) return NotFound();
+
+            user.FullName = dto.FullName ?? user.FullName;
+
+            if (user.Role == Models.UserRole.Organiser && user.OrganiserProfile != null)
+            {
+                user.OrganiserProfile.OrganizationName = dto.OrganizationName ?? user.OrganiserProfile.OrganizationName;
+            }
+            else if (user.Role == Models.UserRole.Participant && user.ParticipantProfile != null)
+            {
+                user.ParticipantProfile.EmergencyContact = dto.EmergencyContact ?? user.ParticipantProfile.EmergencyContact;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { Message = "Profile updated successfully." });
+        }
+    }
+
+    public class UpdateProfileDto
+    {
+        public string? FullName { get; set; }
+        public string? OrganizationName { get; set; }
+        public string? EmergencyContact { get; set; }
+    }
+}
