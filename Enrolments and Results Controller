@@ -1,0 +1,120 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using RaceDay.API.Data;
+using RaceDay.API.Models;
+using System.Security.Claims;
+
+namespace RaceDay.API.Controllers
+{
+    [Authorize]
+    [ApiController]
+    [Route("api/[controller]")]
+    public class RegistrationsController : ControllerBase
+    {
+        private readonly RaceDayDbContext _context;
+
+        public RegistrationsController(RaceDayDbContext context)
+        {
+            _context = context;
+        }
+
+        // Participant: Enter an event by selecting a category[cite: 4]
+        [HttpPost("enrol")]
+        [Authorize(Roles = "Participant")]
+        public async Task<IActionResult> EnrolInEvent([FromBody] EnrolmentDto dto)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var participant = await _context.ParticipantProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
+            if (participant == null) return BadRequest("Participant profile not found.");
+
+            var category = await _context.Categories.FirstOrDefaultAsync(c => c.CategoryId == dto.CategoryId && c.EventId == dto.EventId);
+            if (category == null) return BadRequest("Invalid category or event selection.");
+
+            var existingEnrolment = await _context.Registrations
+                .FirstOrDefaultAsync(r => r.ParticipantProfileId == participant.ParticipantProfileId && r.EventId == dto.EventId);
+
+            if (existingEnrolment != null) return BadRequest("Already enrolled in this event.");
+
+            var registration = new Registration
+            {
+                ParticipantProfileId = participant.ParticipantProfileId,
+                EventId = dto.EventId,
+                CategoryId = dto.CategoryId
+            };
+
+            _context.Registrations.Add(registration);
+            await _context.SaveChangesAsync();
+            return Ok(new { Message = "Successfully enrolled in the event." });
+        }
+
+        // Organiser: View all enrolments for their events[cite: 4]
+        [HttpGet("organiser/enrolments")]
+        [Authorize(Roles = "Organiser")]
+        public async Task<IActionResult> GetOrganiserEnrolments()
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var org = await _context.OrganiserProfiles.FirstOrDefaultAsync(o => o.UserId == userId);
+            if (org == null) return NotFound();
+
+            var enrolments = await _context.Registrations
+                .Include(r => r.Event)
+                .Include(r => r.Category)
+                .Include(r => r.Participant)
+                .ThenInclude(p => p.User)
+                .Where(r => r.Event.OrganiserProfileId == org.OrganiserProfileId)
+                .ToListAsync();
+
+            return Ok(enrolments);
+        }
+
+        // Organiser: Capture finish times and positions[cite: 4]
+        [HttpPost("results")]
+        [Authorize(Roles = "Organiser")]
+        public async Task<IActionResult> CaptureResult([FromBody] ResultDto dto)
+        {
+            var result = new Result
+            {
+                EventId = dto.EventId,
+                ParticipantProfileId = dto.ParticipantProfileId,
+                FinishTime = dto.FinishTime,
+                Position = dto.Position
+            };
+
+            _context.Results.Add(result);
+            await _context.SaveChangesAsync();
+            return Ok(new { Message = "Result captured successfully." });
+        }
+
+        // Participant: View their own results[cite: 4]
+        [HttpGet("my-results")]
+        [Authorize(Roles = "Participant")]
+        public async Task<IActionResult> GetMyResults()
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var participant = await _context.ParticipantProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
+            if (participant == null) return NotFound();
+
+            var results = await _context.Results
+                .Include(r => r.Event)
+                .Where(r => r.ParticipantProfileId == participant.ParticipantProfileId)
+                .ToListAsync();
+
+            return Ok(results);
+        }
+    }
+
+    public class EnrolmentDto
+    {
+        public int EventId { get; set; }
+        public int CategoryId { get; set; }
+    }
+
+    public class ResultDto
+    {
+        public int EventId { get; set; }
+        public int ParticipantProfileId { get; set; }
+        public string FinishTime { get; set; } = string.Empty;
+        public int Position { get; set; }
+    }
+}
