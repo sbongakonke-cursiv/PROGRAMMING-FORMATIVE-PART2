@@ -1,0 +1,34 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace RaceDay.API.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class EventsController : ControllerBase
+    {
+        // Publicly Accessible: Anyone can browse upcoming events
+        [HttpGet("public-list")]
+        [AllowAnonymous]
+        public IActionResult GetPublicEvents()
+        {
+            return Ok("List of public events available for all users to view.");
+        }
+
+        // Organiser ONLY: Create & Manage Events
+        [HttpPost("create")]
+        [Authorize(Roles = "Organiser")]
+        public IActionResult CreateEvent()
+        {
+            return Ok("Event created successfully. (Organiser function)");
+        }
+
+        // Participant ONLY: Enter Event
+        [HttpPost("enter-event")]
+        [Authorize(Roles = "Participant")]
+        public IActionResult EnterEvent()
+        {
+            return Ok("Entered event successfully. (Participant function)");
+        }
+    }
+}
